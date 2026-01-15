@@ -11,9 +11,14 @@ public sealed class RouteDefinition
     public required string Id { get; init; }
 
     /// <summary>
-    /// HTTP method (GET, POST, PUT, DELETE, PATCH).
+    /// The type of entry, e.g., "endpoint" or "controller".
     /// </summary>
-    public required string HttpMethod { get; init; }
+    public required string Type { get; init; }
+
+    /// <summary>
+    /// HTTP method (GET, POST, PUT, DELETE, PATCH). Null for controllers.
+    /// </summary>
+    public string? HttpMethod { get; init; }
 
     /// <summary>
     /// The route path (e.g., "/api/users/{id}").

@@ -79,6 +79,7 @@ public sealed class RouteAttributeParser
                 yield return new RouteDefinition
                 {
                     Id = Guid.NewGuid().ToString(),
+                    Type = "endpoint",
                     HttpMethod = httpMethod,
                     Path = fullPath,
                     Source = new SourceLocation

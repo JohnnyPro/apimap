@@ -11,7 +11,7 @@ public sealed class RouteSymbols
     public required string Controller { get; init; }
 
     /// <summary>
-    /// Name of the action method.
+    /// Name of the action method. Null for controllers.
     /// </summary>
-    public required string Action { get; init; }
+    public string? Action { get; init; }
 }

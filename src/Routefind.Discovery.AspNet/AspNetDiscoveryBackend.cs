@@ -91,6 +91,31 @@ public sealed class AspNetDiscoveryBackend : IDiscoveryBackend
 
         foreach (var controller in controllers)
         {
+            var location = controller.ClassDeclaration.GetLocation().GetLineSpan();
+            var relativePath = Path.GetRelativePath(repositoryRoot, controller.FilePath);
+
+            var controllerRoute = new RouteDefinition
+            {
+                Id = Guid.NewGuid().ToString(),
+                Type = "controller",
+                HttpMethod = null,
+                Path = controller.RoutePrefix ?? "",
+                Source = new SourceLocation
+                {
+                    File = relativePath,
+                    Line = location.StartLinePosition.Line + 1
+                },
+                Symbols = new RouteSymbols
+                {
+                    Controller = controller.ClassSymbol.Name,
+                    Action = null
+                }
+            };
+            routes.Add(controllerRoute);
+        }
+
+        foreach (var controller in controllers)
+        {
             var semanticModel = compilation.GetSemanticModel(controller.ClassDeclaration.SyntaxTree);
             var controllerRoutes = routeParser.ParseActions(controller, semanticModel, repositoryRoot).ToList();
 

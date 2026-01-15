@@ -23,18 +23,23 @@ public static class ListCommand
             ["--path", "-p"],
             "Filter by path (contains search)");
 
+        var typeOption = new Option<string?>(
+            ["--type", "-t"],
+            "Filter by type: 'c' for controllers, 'e' for endpoints.");
+
         command.AddOption(methodOption);
         command.AddOption(pathOption);
+        command.AddOption(typeOption);
 
-        command.SetHandler(async (string? method, string? path) =>
+        command.SetHandler(async (string? method, string? path, string? type) =>
         {
-            await ExecuteAsync(method, path);
-        }, methodOption, pathOption);
+            await ExecuteAsync(method, path, type);
+        }, methodOption, pathOption, typeOption);
 
         return command;
     }
 
-    private static async Task ExecuteAsync(string? methodFilter, string? pathFilter)
+    private static async Task ExecuteAsync(string? methodFilter, string? pathFilter, string? typeFilter)
     {
         var repositoryRoot = Environment.CurrentDirectory;
         var indexStore = new IndexStore(repositoryRoot);
@@ -60,7 +65,7 @@ public static class ListCommand
             await indexStore.SaveAsync(index);
             Console.WriteLine();
 
-            DisplayRoutes(index, methodFilter, pathFilter);
+            DisplayRoutes(index, methodFilter, pathFilter, typeFilter);
         }
         else
         {
@@ -71,23 +76,36 @@ public static class ListCommand
                 return;
             }
 
-            DisplayRoutes(index, methodFilter, pathFilter);
+            DisplayRoutes(index, methodFilter, pathFilter, typeFilter);
         }
     }
 
-    private static void DisplayRoutes(RouteIndex index, string? methodFilter, string? pathFilter)
+    private static void DisplayRoutes(RouteIndex index, string? methodFilter, string? pathFilter, string? typeFilter)
     {
         var routes = index.Routes.AsEnumerable();
+
+        // Filter by type
+        if (!string.IsNullOrEmpty(typeFilter))
+        {
+            if (typeFilter.Equals("c", StringComparison.OrdinalIgnoreCase) || typeFilter.Equals("controller", StringComparison.OrdinalIgnoreCase))
+            {
+                routes = routes.Where(r => r.Type == "controller");
+            }
+            else if (typeFilter.Equals("e", StringComparison.OrdinalIgnoreCase) || typeFilter.Equals("endpoint", StringComparison.OrdinalIgnoreCase))
+            {
+                routes = routes.Where(r => r.Type == "endpoint");
+            }
+        }
 
         // Apply filters
         if (!string.IsNullOrEmpty(methodFilter))
         {
-            routes = routes.Where(r => r.HttpMethod.Equals(methodFilter, StringComparison.OrdinalIgnoreCase));
+            routes = routes.Where(r => r.HttpMethod != null && r.HttpMethod.Equals(methodFilter, StringComparison.OrdinalIgnoreCase));
         }
 
         if (!string.IsNullOrEmpty(pathFilter))
         {
-            routes = routes.Where(r => r.Path.Contains(pathFilter, StringComparison.OrdinalIgnoreCase));
+            routes = routes.Where(r => r.Path != null && r.Path.Contains(pathFilter, StringComparison.OrdinalIgnoreCase));
         }
 
         var routeList = routes.OrderBy(r => r.Path).ThenBy(r => r.HttpMethod).ToList();
@@ -99,13 +117,17 @@ public static class ListCommand
         }
 
         // Calculate column widths
-        var maxMethodWidth = Math.Max(6, routeList.Max(r => r.HttpMethod.Length));
-        var maxPathWidth = Math.Max(4, routeList.Max(r => r.Path.Length));
+        var maxMethodWidth = routeList.Any(r => r.HttpMethod != null) 
+            ? Math.Max(6, routeList.Where(r=>r.HttpMethod != null).Max(r => r.HttpMethod!.Length)) 
+            : 6;
+        var maxPathWidth = routeList.Any(r => !string.IsNullOrEmpty(r.Path))
+            ? Math.Max(4, routeList.Where(r => !string.IsNullOrEmpty(r.Path)).Max(r => r.Path.Length))
+            : 4;
 
         foreach (var route in routeList)
         {
-            var method = route.HttpMethod.PadRight(maxMethodWidth);
-            var path = route.Path.PadRight(maxPathWidth);
+            var method = (route.HttpMethod ?? "").PadRight(maxMethodWidth);
+            var path = (route.Path ?? "").PadRight(maxPathWidth);
             var location = $"{route.Source.File}:{route.Source.Line}";
 
             Console.WriteLine($"{method}  {path}  {location}");
