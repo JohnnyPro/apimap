@@ -1,0 +1,41 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4C1F88FF-6AB6-4FFE-9EB2-A2ACEC5A0224}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Routefind.Core", "src\Routefind.Core\Routefind.Core.csproj", "{C4840C98-ABD5-4BE4-BC16-A562C1D5AECF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Routefind.Discovery.AspNet", "src\Routefind.Discovery.AspNet\Routefind.Discovery.AspNet.csproj", "{FBC471F2-0EF6-476E-B6B1-9843356DA76A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Routefind.Cli", "src\Routefind.Cli\Routefind.Cli.csproj", "{3B6FD7F7-675C-4833-94B1-410BAC041584}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C4840C98-ABD5-4BE4-BC16-A562C1D5AECF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C4840C98-ABD5-4BE4-BC16-A562C1D5AECF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C4840C98-ABD5-4BE4-BC16-A562C1D5AECF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C4840C98-ABD5-4BE4-BC16-A562C1D5AECF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FBC471F2-0EF6-476E-B6B1-9843356DA76A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FBC471F2-0EF6-476E-B6B1-9843356DA76A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FBC471F2-0EF6-476E-B6B1-9843356DA76A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FBC471F2-0EF6-476E-B6B1-9843356DA76A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3B6FD7F7-675C-4833-94B1-410BAC041584}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B6FD7F7-675C-4833-94B1-410BAC041584}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B6FD7F7-675C-4833-94B1-410BAC041584}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B6FD7F7-675C-4833-94B1-410BAC041584}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{C4840C98-ABD5-4BE4-BC16-A562C1D5AECF} = {4C1F88FF-6AB6-4FFE-9EB2-A2ACEC5A0224}
+		{FBC471F2-0EF6-476E-B6B1-9843356DA76A} = {4C1F88FF-6AB6-4FFE-9EB2-A2ACEC5A0224}
+		{3B6FD7F7-675C-4833-94B1-410BAC041584} = {4C1F88FF-6AB6-4FFE-9EB2-A2ACEC5A0224}
+	EndGlobalSection
+EndGlobal
