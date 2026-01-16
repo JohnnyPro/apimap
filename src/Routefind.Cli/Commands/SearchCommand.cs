@@ -41,23 +41,45 @@ public static class SearchCommand
         var methodOption = new Option<string?>(
             ["--method", "-m"],
             "Filter by HTTP method (implies -t e). E.g., GET, POST, PUT, DELETE");
+        
+        
+        var limitOption = new Option<int?>(
+            ["--limit", "-l"],
+            getDefaultValue: () => 10,
+            "Limit the number of matched outputted");
 
+        limitOption.AddValidator(result =>
+        {
+            if (result.Tokens.Count > 0)
+            {
+                if (!int.TryParse(result.Tokens[0].Value, out var value))
+                {
+                    result.ErrorMessage = $"'{result.Tokens[0].Value}' is not a valid integer for --limit.";
+                }
+                else if (value <= 0)
+                {
+                    result.ErrorMessage = "--limit must be greater than 0.";
+                }
+            }
+        });
+        
         var command = new Command("search", "Search for routes (fuzzy matching)")
         {
             searchArg,
             typeOption,
-            methodOption
+            methodOption,
+            limitOption
         };
 
-        command.SetHandler(async (string? pattern, string? type, string? method) =>
+        command.SetHandler(async (string? pattern, string? type, string? method, int? limit) =>
         {
-            await ExecuteSearchAsync(pattern, type, method);
-        }, searchArg, typeOption, methodOption);
+            await ExecuteSearchAsync(pattern, type, method, limit);
+        }, searchArg, typeOption, methodOption, limitOption);
 
         return command;
     }
 
-    public static async Task ExecuteSearchAsync(string? pattern, string? typeFilter, string? methodFilter)
+    public static async Task ExecuteSearchAsync(string? pattern, string? typeFilter, string? methodFilter, int? limit)
     {
         var repositoryRoot = Environment.CurrentDirectory;
         var indexStore = new IndexStore(repositoryRoot);
@@ -97,6 +119,9 @@ public static class SearchCommand
         // Perform search
         var results = Search(index, pattern, searchType, methodFilter);
 
+        if (limit.HasValue)
+            results = results.Take(limit.Value).ToList();
+        
         // Display results
         DisplayResults(results, searchType);
     }
@@ -117,7 +142,22 @@ public static class SearchCommand
     {
         var results = new List<SearchResult>();
 
-        foreach (var route in index.Routes)
+        IEnumerable<RouteDefinition> validRoutes = index.Routes;
+
+
+        switch (searchType)
+        {
+            case SearchType.Controller:
+                validRoutes = validRoutes.Where(x => x.Type == "controller");
+                break;
+            case SearchType.Endpoint:
+                validRoutes = validRoutes.Where(x => x.Type == "endpoint");
+                break;
+            default:
+            case SearchType.All:
+                break;
+        }
+        foreach (var route in validRoutes)
         {
             // Apply method filter
             if (!string.IsNullOrEmpty(methodFilter) &&
@@ -133,27 +173,33 @@ public static class SearchCommand
             {
                 // No pattern = match all
                 score = 100;
-                matchedOn = searchType == SearchType.Controller ? route.Symbols.Controller : route.Path;
-            }
-            else if (searchType == SearchType.Controller)
-            {
-                score = FuzzyMatcher.MatchController(route.Symbols.Controller, pattern);
-                matchedOn = route.Symbols.Controller;
-            }
-            else if (searchType == SearchType.Endpoint)
-            {
-                score = FuzzyMatcher.Match(route.Path, pattern);
                 matchedOn = route.Path;
             }
             else
             {
-                // Search both path and controller
                 var pathScore = FuzzyMatcher.Match(route.Path, pattern);
                 var controllerScore = FuzzyMatcher.MatchController(route.Symbols.Controller, pattern);
-                var actionScore = FuzzyMatcher.Match(route.Symbols.Action, pattern);
-
-                score = Math.Max(pathScore, Math.Max(controllerScore, actionScore));
-                matchedOn = pathScore >= controllerScore ? route.Path : route.Symbols.Controller;
+                var actionScore = route.Symbols.Action is null ? 0 : FuzzyMatcher.Match(route.Symbols.Action, pattern) / 10;
+                switch (searchType)
+                {
+                    case SearchType.Controller:
+                        score = Math.Max(pathScore, controllerScore);
+                        matchedOn = pathScore > controllerScore ? route.Path : route.Symbols.Controller;
+                        break;
+                    case SearchType.Endpoint:
+                        if (score == pathScore)
+                            matchedOn = route.Path;
+                        else if (score == controllerScore)
+                            matchedOn = route.Symbols.Controller;
+                        else
+                            matchedOn = route.Symbols.Action!;
+                        break;
+                    default:
+                    case SearchType.All:
+                        score = Math.Max(pathScore, controllerScore);
+                        matchedOn = pathScore > controllerScore ? route.Path : route.Symbols.Controller;
+                        break;
+                }
             }
 
             if (score > 0)
