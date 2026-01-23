@@ -20,12 +20,15 @@ public class Program
             args = ["search", .. args];
         }
 
+        var configService = new Configuration.ConfigService();
+        var cliConfig = configService.Config;
+        
         var rootCommand = new RootCommand("apimap - Discover and search HTTP routes")
         {
             Name = "apimap"
         };
 
-        rootCommand.AddCommand(SearchCommand.Create());
+        rootCommand.AddCommand(SearchCommand.Create(cliConfig));
         rootCommand.AddCommand(ListCommand.Create());
         rootCommand.AddCommand(DiscoverCommand.Create());
         rootCommand.AddCommand(DiscoverCommand.CreateRediscover());
