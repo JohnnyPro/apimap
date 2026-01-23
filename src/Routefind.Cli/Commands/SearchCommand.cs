@@ -6,6 +6,7 @@ using Routefind.Core.Cache;
 using Routefind.Core.Discovery;
 using Routefind.Core.Index;
 using Routefind.Cli.Prompts;
+using System.Linq;
 
 namespace Routefind.Cli.Commands;
 
@@ -23,18 +24,13 @@ public enum SearchType
 }
 
 /// <summary>
-/// A search result with its match score.
-/// </summary>
-public sealed record SearchResult(RouteDefinition Route, int Score, string MatchedOn);
-
-/// <summary>
 /// Command to search routes with fuzzy matching.
 /// </summary>
 public static class SearchCommand
 {
     public static Command Create(CliConfig config)
     {
-        var searchArg = new Argument<string?>("pattern", () => null, "Search pattern for routes (fuzzy, case-insensitive)");
+        var searchArg = new Argument<string?>("pattern", () => null, "Search pattern for routes (regex by default, fuzzy with -f)");
 
         var typeOption = new Option<string?>(
             ["--type", "-t"],
@@ -49,6 +45,9 @@ public static class SearchCommand
         var openOption = new Option<bool>(
             ["--open", "-o"],
             "Open the first search result in the configured default editor.");
+        var fuzzyOption = new Option<bool>(
+            ["--fuzzy", "-f"],
+            "Use fuzzy matching instead of regex matching."); // New fuzzy option
 
         limitOption.AddValidator(result =>
         {
@@ -64,24 +63,25 @@ public static class SearchCommand
                 }
             }
         });
-        var command = new Command("search", "Search for routes (fuzzy matching)")
+        var command = new Command("search", "Search for routes (regex by default, fuzzy with -f)")
         {
             searchArg,
             typeOption,
             methodOption,
             limitOption,
-            openOption
+            openOption,
+            fuzzyOption // Add new option to command
         };
 
-        command.SetHandler(async (string? pattern, string? type, string? method, int? limit, bool open) =>
+        command.SetHandler(async (string? pattern, string? type, string? method, int? limit, bool open, bool fuzzy) => // Add fuzzy parameter
         {
-            await ExecuteSearchAsync(pattern, type, method, limit, open, config);
-        }, searchArg, typeOption, methodOption, limitOption, openOption);
+            await ExecuteSearchAsync(pattern, type, method, limit, open, fuzzy, config); // Pass fuzzy parameter
+        }, searchArg, typeOption, methodOption, limitOption, openOption, fuzzyOption); // Add fuzzy option to handler
 
         return command;
     }
 
-    public static async Task ExecuteSearchAsync(string? pattern, string? typeFilter, string? methodFilter, int? limit, bool open, CliConfig config)
+    public static async Task ExecuteSearchAsync(string? pattern, string? typeFilter, string? methodFilter, int? limit, bool open, bool fuzzy, CliConfig config) // Add fuzzy parameter
     {
         var repositoryRoot = Environment.CurrentDirectory;
         var indexStore = new IndexStore(repositoryRoot);
@@ -118,8 +118,12 @@ public static class SearchCommand
             searchType = SearchType.Endpoint;
         }
 
-        // Perform search
-        var results = Search(index, pattern, searchType, methodFilter);
+        // Instantiate appropriate searcher
+        ISearcher searcher = fuzzy ? new FuzzySearcher() : new RegexSearcher(); // Use fuzzy flag
+
+        // Perform search using the chosen searcher
+        var results = searcher.Search(pattern ?? string.Empty, index.Routes, searchType, methodFilter).ToList();
+
 
         if (results.Count == 0)
         {
@@ -199,7 +203,7 @@ public static class SearchCommand
                 using var process = new Process();
                 var isWindows = OperatingSystem.IsWindows();
                 process.StartInfo.FileName = isWindows ? "cmd" : "/bin/sh";
-                process.StartInfo.Arguments = isWindows ? $"/c {commandString}" : $"-c \"{commandString}\"";
+                process.StartInfo.Arguments = isWindows ? $"/c {commandString}" : $"-c \"{commandString}\"" ;
                 process.StartInfo.UseShellExecute = false;
 
                 if (editorCommand.LaunchType == LaunchType.Inline)
@@ -250,79 +254,7 @@ public static class SearchCommand
         };
     }
 
-    private static List<SearchResult> Search(RouteIndex index, string? pattern, SearchType searchType, string? methodFilter)
-    {
-        var results = new List<SearchResult>();
-
-        IEnumerable<RouteDefinition> validRoutes = index.Routes;
-
-
-        switch (searchType)
-        {
-            case SearchType.Controller:
-                validRoutes = validRoutes.Where(x => x.Type == "controller");
-                break;
-            case SearchType.Endpoint:
-                validRoutes = validRoutes.Where(x => x.Type == "endpoint");
-                break;
-            default:
-            case SearchType.All:
-                break;
-        }
-        foreach (var route in validRoutes)
-        {
-            // Apply method filter
-            if (!string.IsNullOrEmpty(methodFilter) &&
-                (route.HttpMethod == null || !route.HttpMethod.Equals(methodFilter, StringComparison.OrdinalIgnoreCase)))
-            {
-                continue;
-            }
-
-            int score = 0;
-            string matchedOn = "";
-
-            if (string.IsNullOrEmpty(pattern))
-            {
-                // No pattern = match all
-                score = 100;
-                matchedOn = route.Path;
-            }
-            else
-            {
-                var pathScore = FuzzyMatcher.MatchPath(route.Path, pattern);
-                var controllerScore = FuzzyMatcher.MatchController(route.Symbols.Controller, pattern);
-                var actionScore = route.Symbols.Action is null ? 0 : FuzzyMatcher.MatchWord(route.Symbols.Action, pattern) / 10;
-                switch (searchType)
-                {
-                    case SearchType.Controller:
-                        score = Math.Max(pathScore, controllerScore);
-                        matchedOn = pathScore > controllerScore ? route.Path : route.Symbols.Controller;
-                        break;
-                    case SearchType.Endpoint:
-                        score = new List<int>() { pathScore, controllerScore, actionScore }.Max();
-                        if (score == pathScore)
-                            matchedOn = route.Path;
-                        else if (score == controllerScore)
-                            matchedOn = route.Symbols.Controller;
-                        else
-                            matchedOn = route.Symbols.Action ?? "";
-                        break;
-                    default:
-                    case SearchType.All:
-                        score = Math.Max(pathScore, controllerScore);
-                        matchedOn = pathScore > controllerScore ? route.Path : route.Symbols.Controller;
-                        break;
-                }
-            }
-
-            if (score > 0)
-            {
-                results.Add(new SearchResult(route, score, matchedOn));
-            }
-        }
-
-        return results.OrderByDescending(r => r.Score).ThenBy(r => r.Route.Path).ToList();
-    }
+    // Removed the private static List<SearchResult> Search(...) method
 
     private static void DisplayResults(List<SearchResult> results, SearchType searchType, int originalCount)
     {
