@@ -45,7 +45,6 @@ public static class SearchCommand
         
         var limitOption = new Option<int?>(
             ["--limit", "-l"],
-            getDefaultValue: () => 10,
             "Limit the number of matched outputted");
 
         limitOption.AddValidator(result =>
@@ -121,6 +120,14 @@ public static class SearchCommand
 
         if (limit.HasValue)
             results = results.Take(limit.Value).ToList();
+        else
+        {
+            // Smart limiting
+            var highestScore = results.Select(x => x.Score).Max();
+            results = results.Where(x => x.Score > (double)highestScore * 0.4)
+                .Take(10) // Limited by default
+                .ToList();
+        }
         
         // Display results
         DisplayResults(results, searchType);
@@ -177,9 +184,9 @@ public static class SearchCommand
             }
             else
             {
-                var pathScore = FuzzyMatcher.Match(route.Path, pattern);
+                var pathScore = FuzzyMatcher.MatchPath(route.Path, pattern);
                 var controllerScore = FuzzyMatcher.MatchController(route.Symbols.Controller, pattern);
-                var actionScore = route.Symbols.Action is null ? 0 : FuzzyMatcher.Match(route.Symbols.Action, pattern) / 10;
+                var actionScore = route.Symbols.Action is null ? 0 : FuzzyMatcher.MatchWord(route.Symbols.Action, pattern) / 10;
                 switch (searchType)
                 {
                     case SearchType.Controller:
@@ -187,6 +194,8 @@ public static class SearchCommand
                         matchedOn = pathScore > controllerScore ? route.Path : route.Symbols.Controller;
                         break;
                     case SearchType.Endpoint:
+                        
+                        score = new List<int>() {pathScore, controllerScore, actionScore}.Max();
                         if (score == pathScore)
                             matchedOn = route.Path;
                         else if (score == controllerScore)
@@ -219,44 +228,21 @@ public static class SearchCommand
             return;
         }
 
-        if (searchType == SearchType.Controller)
+        var maxMethodWidth = Math.Max(6, results.Max(r => r.Route.HttpMethod?.Length ?? 0));
+        var maxPathWidth = Math.Max(4, Math.Min(50, results.Max(r => r.Route.Path.Length)));
+
+        var foundCount = results.Count;
+        foreach (var result in results)
         {
-            // Group by controller
-            var grouped = results
-                .GroupBy(r => r.Route.Symbols.Controller)
-                .OrderByDescending(g => g.Max(r => r.Score));
+            var route = result.Route;
+            var method = route.HttpMethod?.PadRight(maxMethodWidth) ?? "";
+            var path = route.Path.Length > 50 ? route.Path[..47] + "..." : route.Path.PadRight(maxPathWidth);
+            var location = $"{route.Source.File}:{route.Source.Line}";
 
-            foreach (var group in grouped)
-            {
-                var firstRoute = group.First().Route;
-                Console.WriteLine($"{group.Key}");
-                Console.WriteLine($"  {firstRoute.Source.File}");
-
-                foreach (var result in group.OrderBy(r => r.Route.Source.Line))
-                {
-                    Console.WriteLine($"    :{result.Route.Source.Line} {result.Route.HttpMethod,-7} {result.Route.Path}");
-                }
-                Console.WriteLine();
-            }
-        }
-        else
-        {
-            // Display as endpoint list
-            var maxMethodWidth = Math.Max(6, results.Max(r => r.Route.HttpMethod.Length));
-            var maxPathWidth = Math.Max(4, Math.Min(50, results.Max(r => r.Route.Path.Length)));
-
-            foreach (var result in results)
-            {
-                var route = result.Route;
-                var method = route.HttpMethod.PadRight(maxMethodWidth);
-                var path = route.Path.Length > 50 ? route.Path[..47] + "..." : route.Path.PadRight(maxPathWidth);
-                var location = $"{route.Source.File}:{route.Source.Line}";
-
-                Console.WriteLine($"{method}  {path}  {location}");
-            }
+            Console.WriteLine($"{method} {path}  {location}");
         }
 
         Console.WriteLine();
-        Console.WriteLine($"Found {results.Count} result(s)");
+        Console.WriteLine($"Found {foundCount} result(s)");
     }
 }
