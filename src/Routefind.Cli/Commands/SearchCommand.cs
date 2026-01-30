@@ -203,7 +203,7 @@ public static class SearchCommand
                 using var process = new Process();
                 var isWindows = OperatingSystem.IsWindows();
                 process.StartInfo.FileName = isWindows ? "cmd" : "/bin/sh";
-                process.StartInfo.Arguments = isWindows ? $"/c {commandString}" : $"-c \"{commandString}\"" ;
+                process.StartInfo.Arguments = isWindows ? $"/c {commandString}" : $"-c \"{commandString}\"";
                 process.StartInfo.UseShellExecute = false;
 
                 if (editorCommand.LaunchType == LaunchType.Inline)
@@ -271,7 +271,10 @@ public static class SearchCommand
         {
             var route = result.Route;
             var method = (route.HttpMethod ?? "").PadRight(maxMethodWidth);
-            var path = route.Path.Length > 50 ? route.Path[..47] + "..." : route.Path.PadRight(maxPathWidth);
+            var path =
+                route.Path.Length > 50
+                    ? "..." + route.Path[^47..]
+                    : route.Path.PadRight(maxPathWidth);
             var location = $"{route.Source.File}:{route.Source.Line}";
 
             Console.WriteLine($"{method} {path}  {location}");
